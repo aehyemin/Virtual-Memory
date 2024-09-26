@@ -2,6 +2,8 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+#include "lib/kernel/hash.h"
+#include "devices/disk.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -40,19 +42,22 @@ struct thread;
  * This is kind of "parent class", which has four "child class"es, which are
  * uninit_page, file_page, anon_page, and page cache (project4).
  * DO NOT REMOVE/MODIFY PREDEFINED MEMBER OF THIS STRUCTURE. */
-struct page {
-	const struct page_operations *operations;
+struct page {//가상 메모리 페이지의 기본 구조체
+	const struct page_operations *operations;//스왑인아웃,삭제 처리
 	void *va;              /* Address in terms of user space */
 	struct frame *frame;   /* Back reference for frame */
 
-	/* Your implementation */
+
+	/* 하혜민 */
+	struct hash_elem hash_elem;
+	bool writable;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
-	union {
-		struct uninit_page uninit;
-		struct anon_page anon;
-		struct file_page file;
+	union {//실제 데이터는 유니온으로 각 페이지 타입에 따라 다르게 저장됨
+		struct uninit_page uninit; //비초기화 페이지
+		struct anon_page anon; //익명 페이지
+		struct file_page file; //파일 페이지
 #ifdef EFILESYS
 		struct page_cache page_cache;
 #endif
@@ -60,9 +65,11 @@ struct page {
 };
 
 /* The representation of "frame" */
-struct frame {
-	void *kva;
-	struct page *page;
+struct frame {//물리적 메모리에서의 페이지 위치
+	void *kva; //물리 메모리 주소
+	struct page *page; //이 프레임에 대응하는 가상 메모리 페이지의 page 포인터
+	struct list_elem frame_elem;
+	
 };
 
 /* The function table for page operations.
@@ -85,7 +92,25 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
+	//hash table 사용. 하혜민
+	struct hash spt_hash;
 };
+
+
+// /* Hash table. */
+// struct hash {
+// 	size_t elem_cnt;            /* Number of elements in table. */
+// 	size_t bucket_cnt;          /* Number of buckets, a power of 2. */
+// 	struct list *buckets;       /* Array of `bucket_cnt' lists. */
+// 	hash_hash_func *hash;       /* Hash function. */
+// 	hash_less_func *less;       /* Comparison function. */
+// 	void *aux;                  /* Auxiliary data for `hash' and `less'. */
+// };
+
+// /* Hash element. */
+// struct hash_elem {
+// 	struct list_elem list_elem;
+// };
 
 #include "threads/thread.h"
 void supplemental_page_table_init (struct supplemental_page_table *spt);
@@ -108,5 +133,10 @@ bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
 void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
+
+struct list swap_table;
+struct list frame_table;
+struct lock swap_table_lock;
+struct lock frame_table_lock;
 
 #endif  /* VM_VM_H */

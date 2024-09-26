@@ -72,6 +72,9 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	int number = f->R.rax;
+#ifdef VM
+    thread_current()->rsp = f->rsp; // 추가
+#endif
 	switch (number)
 	{
 		case SYS_HALT:
@@ -132,18 +135,26 @@ void exit (int status){
 pid_t fork (const char *thread_name, struct intr_frame *f){
 	return process_fork(thread_name, f);
 }
-int exec (const char *cmd_line){
+int exec(const char *cmd_line)
+{
 	check_ptr(cmd_line);
 
-	if(thread_current()->exec_file != NULL) {
-		file_close(thread_current()->exec_file);
-		thread_current()->exec_file = NULL;
-	}
+	// process.c 파일의 process_create_initd 함수와 유사하다.
+	// 단, 스레드를 새로 생성하는 건 fork에서 수행하므로
+	// 이 함수에서는 새 스레드를 생성하지 않고 process_exec을 호출한다.
 
-	char *copy = palloc_get_page(0);
-	strlcpy(copy, cmd_line, PGSIZE);
-	process_exec(copy);
-	exit(-1);
+	// process_exec 함수 안에서 filename을 변경해야 하므로
+	// 커널 메모리 공간에 cmd_line의 복사본을 만든다.
+	// (현재는 const char* 형식이기 때문에 수정할 수 없다.)
+	char *cmd_line_copy;
+	cmd_line_copy = palloc_get_page(0);
+	if (cmd_line_copy == NULL)
+		exit(-1);							  // 메모리 할당 실패 시 status -1로 종료한다.
+	strlcpy(cmd_line_copy, cmd_line, PGSIZE); // cmd_line을 복사한다.
+
+	// 스레드의 이름을 변경하지 않고 바로 실행한다.
+	if (process_exec(cmd_line_copy) == -1)
+		exit(-1); // 실패 시 status -1로 종료한다.
 }
 int wait (pid_t pid){
 	return process_wait(pid);
@@ -236,8 +247,14 @@ struct file *get_file(int fd){
 	return thread_current()->fdt[fd];
 }
 
-void check_ptr(void *ptr){
-	if(ptr == NULL || !is_user_vaddr(ptr) || pml4_get_page(thread_current()->pml4, ptr) == NULL) exit(-1);
+void check_ptr(void *ptr)
+{
+	if (ptr == NULL)
+		exit(-1);
+	if (!is_user_vaddr(ptr))
+		exit(-1);
+	// if (pml4_get_page(thread_current()->pml4, ptr) == NULL)
+	//  	exit(-1);
 }
 
 bool check_fd(int fd){
