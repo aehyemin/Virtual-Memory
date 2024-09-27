@@ -71,7 +71,12 @@ syscall_init (void) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
+	//printf("syscall_handler 시작\n");  // 이 출력이 되는지 먼저 확인
 	int number = f->R.rax;
+	//printf("syscall_handler: f = %p, rip = %p, rsp = %p\n", f, f->rip, f->rsp);
+//#ifdef VM
+    //thread_current()->rsp = f->rsp; // 추가
+//#endif
 	switch (number)
 	{
 		case SYS_HALT:
@@ -236,9 +241,20 @@ struct file *get_file(int fd){
 	return thread_current()->fdt[fd];
 }
 
-void check_ptr(void *ptr){
-	if(ptr == NULL || !is_user_vaddr(ptr) || pml4_get_page(thread_current()->pml4, ptr) == NULL) exit(-1);
+void check_ptr(void *ptr)
+{
+	if (ptr == NULL) {
+	printf("Invalid pointer access at %p\n", ptr);
+		exit(-1);
+	}
+	if (!is_user_vaddr(ptr)) {
+		exit(-1);
+    printf("Invalid pointer access at %p\n", ptr);
+	}
+	// if (pml4_get_page(thread_current()->pml4, addr) == NULL)
+	// 	exit(-1);
 }
+
 
 bool check_fd(int fd){
 	if(fd < 0 || maxfd <= fd) return true;
