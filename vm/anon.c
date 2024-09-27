@@ -21,6 +21,9 @@ static const struct page_operations anon_ops = {
 void
 vm_anon_init (void) {
 	/* TODO: Set up the swap_disk. */
+	// anonymous page subsystem 초기화
+	// 함수에서 anonymous page와 관련된 모든 것 세팅 가능
+
 	swap_disk = NULL;
 }
 
@@ -31,6 +34,13 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	page->operations = &anon_ops;
 
 	struct anon_page *anon_page = &page->anon;
+
+	// 처음에 `page->operations` 에 있는 anonymous page를 위한 handler set up
+
+
+	// `anon_page` 에 있는 현재는 비어있는 구조체인 몇몇 정보 업데이트 필요
+	
+	// anonymous page의 initializer 함수
 }
 
 /* Swap in the page by read contents from the swap disk. */

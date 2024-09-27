@@ -19,6 +19,22 @@
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
+void halt (void);
+tid_t fork_sys (const char *thread_name, struct intr_frame *f);
+int exec (const char *file);
+int wait (tid_t pid);
+void check_address(const uint64_t *addr);
+bool create (const char *file, unsigned initial_size);
+bool remove (const char *file);
+int open (const char *file);
+int filesize (int fd);
+void check_fd(const int fd);
+int read (int fd, void *buffer, unsigned size);
+void close (int fd);
+int write (int fd, const void *buffer, unsigned size);
+void seek (int fd, unsigned position);
+
+
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -50,7 +66,6 @@ halt (void) {
 	power_off();
 }
 
-static int i = 1;
 void
 exit (int status) {
 	struct thread *curr = thread_current();
@@ -68,9 +83,17 @@ fork_sys (const char *thread_name, struct intr_frame *f){
 	// 템플릿은 전체 user 메모리 공간을 복사하기 위해 `threads/mmu.c`에 있는 `pml4_for_each()` 이용
 }
 
+void check_address(const uint64_t *addr) {
+	struct thread *curr = thread_current();
+	//  || pml4_get_page(curr->pml4, addr) == NULL
+	if (addr == NULL || !(is_user_vaddr(addr))) {
+		exit(-1);
+	}
+}
+
 int
 exec (const char *file) {
-	check_address(file);
+	check_address((const uint64_t *)file);
 
 	char *fn_copy = palloc_get_page(PAL_ZERO);
 	if (fn_copy == NULL) {
@@ -79,6 +102,7 @@ exec (const char *file) {
 	strlcpy(fn_copy, file, strlen(file)+1);
 
 	if (process_exec(fn_copy) == -1) {
+		printf("process exec fail\n");
 		exit(-1);
 	}
 
@@ -91,29 +115,22 @@ wait (tid_t pid) {
 	return process_wait(pid);
 }
 
-void check_address(const uint64_t *addr) {
-	struct thread *curr = thread_current();
-	if (addr == NULL || !(is_user_vaddr(addr)) || pml4_get_page(curr->pml4, addr) == NULL) {
-		exit(-1);
-	}
-}
-
 bool
 create (const char *file, unsigned initial_size) {
-	check_address(file);
+	check_address((const uint64_t *)file);
 	// 새로운 파일 생성
 	return filesys_create(file, initial_size);
 }
 
 bool
 remove (const char *file) {
-	check_address(file);
+	check_address((const uint64_t *)file);
 	return filesys_remove(file);
 }
 
 int
 open (const char *file) {
-	check_address(file);
+	check_address((const uint64_t *)file);
 	struct thread *curr = thread_current();
 	struct file *f;
 
@@ -238,7 +255,7 @@ seek (int fd, unsigned position) {
 	struct thread *curr = thread_current();
 	struct file *file = *(curr->fd_table + fd);
 	if (file == NULL)
-		return -1;
+		return ;
 	file_seek(file, position);	
 }
 
@@ -273,7 +290,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = create((char *)f->R.rdi, f->R.rsi);
 			break;
 		case SYS_REMOVE:
-			f->R.rax = remove(f->R.rdi);
+			f->R.rax = remove((char *)f->R.rdi);
 			break;
 		case SYS_OPEN:
 			f->R.rax = open((char *)f->R.rdi);

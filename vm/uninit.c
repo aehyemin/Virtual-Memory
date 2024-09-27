@@ -52,6 +52,12 @@ uninit_initialize (struct page *page, void *kva) {
 	void *aux = uninit->aux;
 
 	/* TODO: You may need to fix this function. */
+	// 첫번째 fault에서 page 초기화
+	// 템플릿 코드는 먼저 `vm_initializer` 와 `aux` fetch 하고 함수 포인터로 일치하는 page_initializer 호출
+	
+	// 함수 수정 가능
+	// 필요에 따라 `vm_anon_init` and `anon_initializer` in `vm/anon.c` 수정 가능
+
 	return uninit->page_initializer (page, uninit->type, kva) &&
 		(init ? init (page, aux) : true);
 }
@@ -65,4 +71,5 @@ uninit_destroy (struct page *page) {
 	struct uninit_page *uninit UNUSED = &page->uninit;
 	/* TODO: Fill this function.
 	 * TODO: If you don't have anything to do, just return. */
+	
 }
