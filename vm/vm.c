@@ -326,6 +326,11 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
     return true;
 }
 
+void spt_destructor(struct hash_elem *e, void* aux) {
+    const struct page *p = hash_entry(e, struct page, elem);
+    free(p);
+}
+
 /* Free the resource hold by the supplemental page table */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
@@ -335,13 +340,14 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 
 	// `process exit()` 할 때 호출
 	// 페이지 항목을 반복하고 table에 페이지들에 대해 `destroy(page)` 호출
-	struct hash_iterator i;
-    hash_first (&i, &spt->spt_hash);
-	while (hash_next (&i)) {
-        struct page *page = hash_entry (hash_cur (&i), struct page, elem);
-		destroy(page);
-		// free()
-	}
+	// struct hash_iterator i;
+    // hash_first (&i, &spt->spt_hash);
+	// while (hash_next (&i)) {
+    //     struct page *page = hash_entry (hash_cur (&i), struct page, elem);
+	// 	destroy(page);
+	// 	// free()
+	// }
 	// 실제 page table (pml4)과 함수의 물리 메모리 걱정할 필요 없음
 	// 호출자가 supplemental page table clean up한 후에 clean
+	hash_destroy(&spt->spt_hash, spt_destructor);
 }
