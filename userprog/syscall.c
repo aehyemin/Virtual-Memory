@@ -154,6 +154,9 @@ int wait (pid_t pid){
 	return process_wait(pid);
 }
 bool create (const char *file, unsigned initial_size){
+	if (!file){
+	 exit(-1);
+	}
 	check_ptr(file);
 	return filesys_create(file, initial_size);
 }
@@ -162,6 +165,8 @@ bool remove (const char *file){
 	return filesys_remove(file);
 }
 int open (const char *file){
+	if (file == NULL){
+		return -1;}
 	check_ptr(file);
 	if(file[0] == '\0') return -1;
 
