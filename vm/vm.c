@@ -51,8 +51,6 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 
-	printf("유페이지 %p\n", upage);
-
 	/* Check wheter the upage is already occupied or not. */
 	if (spt_find_page (spt, upage) == NULL) {
 		// printf("spt_find_page is NULL\n");
@@ -102,10 +100,7 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	// page->va = va;
 	page->va = pg_round_down(va);
 
-	printf("spt_find_page :: spt_hash :: %p\n", &spt->spt_hash);
-	printf("spt_find_page :: page :: %p\n", page);
 	e = hash_find(&spt->spt_hash, &page->elem);
-	printf("spt_find_page :: hash entry :: %p\n", hash_entry(e, struct page, elem));
 	free(page);
 
 	return e != NULL ? hash_entry(e, struct page, elem): NULL;
@@ -179,6 +174,13 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	// anonymous page를 할당해줌으로써 stack size 증가
+	// 할당을 처리할 때 `addr` 를 PGSIZE로 round down 보장
+	if (vm_alloc_page(VM_ANON | VM_MARKER_0, pg_round_down(addr), 1)) {
+#ifdef VM
+	vm_claim_page(addr);
+#endif
+	}
 }
 
 /* Handle the fault on write_protected page */
@@ -188,8 +190,8 @@ vm_handle_wp (struct page *page UNUSED) {
 
 /* Return true on success */
 bool
-vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
-		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
+vm_try_handle_fault (struct intr_frame *f, void *addr,
+		bool user UNUSED, bool write UNUSED, bool not_present) {
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
@@ -198,18 +200,33 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	// 만약 메모리 참조가 유효하다면 supplemental page table entry를 사용하여 페이지(file system 또는 swap slot 혹은 all-zero page)에 들어갈 데이터 찾기.
     // user 프로세스가 접근하려는 주소에 데이터가 없거나 페이지가 커널 가상 메모리 내에 있거나
 	if (is_kernel_vaddr(addr)) {
-		// printf("is kernel vaddr\n");
         return false;
 	}
-	// printf("addr: %p\n", addr);
 	// read-only page에 write 하려는 접근을 하면 해당 엑세스는 유효하지 않음.
 	// 어떤 유효하지 않은 접근은 process terminate 하고 모든 리소스 free
     // 2. page를 저장하기 위해 frame 얻기.
 	// 3. file system 이나 swap에서 데이터를 읽어오거나 0으로 초기화하는 등의 방식으로 frame에 데이터 fetch.
 	// 4. fault 하는 가상 주소의 page table entry를 물리 페이지로 지정. `threads/mmu.c` 에 있는 함수 사용.
 
-	// printf("vm_claim_page\n");
-	return vm_claim_page (addr);
+	if(not_present) {
+		if(!vm_claim_page(addr)){
+
+#ifdef VM
+	void *rsp = !user ? thread_current()->rsp : f->rsp;
+	// page fault가 stack growth에게 유효한 케이스인지 확인
+	if(rsp - 8 <= addr && USER_STACK - 0x100000 <= addr && addr <= USER_STACK){
+		// fault가 stack growth로 처리될 수 있다로 확인되면,  faulted address와 함께 `vm_stack_growth`  호출
+		vm_stack_growth(addr);
+		// vm_stack_growth(thread_current()->rsp - PGSIZE);
+		return true;
+	}
+#endif
+			return false;
+		}
+		else
+			return true;
+	}
+	return false;
 }
 
 /* Free the page.
@@ -349,5 +366,5 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	// }
 	// 실제 page table (pml4)과 함수의 물리 메모리 걱정할 필요 없음
 	// 호출자가 supplemental page table clean up한 후에 clean
-	hash_destroy(&spt->spt_hash, spt_destructor);
+	hash_clear (&spt->spt_hash, spt_destructor);
 }

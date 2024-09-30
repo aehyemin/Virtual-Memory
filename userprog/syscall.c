@@ -102,7 +102,6 @@ exec (const char *file) {
 	strlcpy(fn_copy, file, strlen(file)+1);
 
 	if (process_exec(fn_copy) == -1) {
-		printf("process exec fail\n");
 		exit(-1);
 	}
 
@@ -268,6 +267,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	// 인수는 %rdi , %rsi, %rdx, %r10, %r8, %r9 순서로 넘겨짐
 	// intr_frame 통해 레지스터 상태 접근
 	// %rax 에 함수 리턴값 배치
+
+#ifdef VM
+	thread_current()->rsp = f->rsp; 
+#endif
 	 
 	switch (f->R.rax)
 	{

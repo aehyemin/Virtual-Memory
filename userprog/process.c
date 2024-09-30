@@ -270,7 +270,6 @@ int process_exec(void *f_name)
 	palloc_free_page(file_name);
 	// printf("palloc_free_page done\n");
 	if (!success) {
-		printf("process_exec :: success none\n");
 		return -1;
 	}
 
@@ -590,7 +589,6 @@ load(const char *file_name, struct intr_frame *if_)
 	if (!setup_stack(if_)) {
 		goto done;
 	}
-	printf("setup stack done\n");
 
 	/* Start address. */
 

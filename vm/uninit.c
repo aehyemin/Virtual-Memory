@@ -71,5 +71,6 @@ uninit_destroy (struct page *page) {
 	struct uninit_page *uninit UNUSED = &page->uninit;
 	/* TODO: Fill this function.
 	 * TODO: If you don't have anything to do, just return. */
-	
+	// page 구조체가 보유하던 리소스 free
+	// 페이지의 vm type 체크하고 그에 따라 처리
 }

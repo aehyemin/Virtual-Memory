@@ -59,4 +59,6 @@ anon_swap_out (struct page *page) {
 static void
 anon_destroy (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
+	//anonymous page 가 보유하던 리소스 free
+	// 명시적으로 페이지 free할 필요 없음 -> 호출자가 할 것
 }
