@@ -318,49 +318,72 @@ vm_do_claim_page(struct page *page)
     return swap_in(page, frame->kva); // uninit_initialize
 }
 
+
+
+
 /* Initialize new supplemental page table */
 void supplemental_page_table_init(struct supplemental_page_table *spt UNUSED)
 {
     hash_init(&spt->spt_hash, page_hash, page_less, NULL);
 }
-/* Copy supplemental page table from src to dst */
+
+
+
 bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
-                                  struct supplemental_page_table *src UNUSED)
+								  struct supplemental_page_table *src UNUSED)
 {
-    struct hash_iterator i;
-    hash_first(&i, &src->spt_hash);
-    while (hash_next(&i))
-    {
-        // src_page 정보
-        struct page *src_page = hash_entry(hash_cur(&i), struct page, hash_elem);
-        enum vm_type type = src_page->operations->type;
-        void *upage = src_page->va;
-        bool writable = src_page->writable;
+	// TODO: 보조 페이지 테이블을 src에서 dst로 복사합니다.
+	// TODO: src의 각 페이지를 순회하고 dst에 해당 entry의 사본을 만듭니다.
+	// TODO: uninit page를 할당하고 그것을 즉시 claim해야 합니다.
+	struct hash_iterator i;
+	hash_first(&i, &src->spt_hash);
+	while (hash_next(&i))
+	{
+		// src_page 정보
+		struct page *src_page = hash_entry(hash_cur(&i), struct page, hash_elem);
+		enum vm_type type = src_page->operations->type;
+		void *upage = src_page->va;
+		bool writable = src_page->writable;
 
-        /* 1) type이 uninit이면 */
-        if (type == VM_UNINIT)
-        { // uninit page 생성 & 초기화
-            vm_initializer *init = src_page->uninit.init;
-            void *aux = src_page->uninit.aux;
-            vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
-            continue;
-        }
+		/* 1) type이 uninit이면 */
+		if (type == VM_UNINIT)
+		{ // uninit page 생성 & 초기화
+			vm_initializer *init = src_page->uninit.init;
+			void *aux = src_page->uninit.aux;
+			vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
+			continue;
+		}
 
-        /* 2) type이 uninit이 아니면 */
-        if (!vm_alloc_page(type, upage, writable)) // uninit page 생성 & 초기화
-            // init이랑 aux는 Lazy Loading에 필요함
-            // 지금 만드는 페이지는 기다리지 않고 바로 내용을 넣어줄 것이므로 필요 없음
-            return false;
+		/* 2) type이 file이면 */
+		if (type == VM_FILE)
+		{
+			struct lazy_load_arg *file_aux = malloc(sizeof(struct lazy_load_arg));
+			file_aux->file = src_page->file.file;
+			file_aux->ofs = src_page->file.ofs;
+			file_aux->read_bytes = src_page->file.read_bytes;
+			file_aux->zero_bytes = src_page->file.zero_bytes;
+			if (!vm_alloc_page_with_initializer(type, upage, writable, NULL, file_aux))
+				return false;
+			struct page *file_page = spt_find_page(dst, upage);
+			file_backed_initializer(file_page, type, NULL);
+			file_page->frame = src_page->frame;
+			pml4_set_page(thread_current()->pml4, file_page->va, src_page->frame->kva, src_page->writable);
+			continue;
+		}
 
-        // vm_claim_page으로 요청해서 매핑 & 페이지 타입에 맞게 초기화
-        if (!vm_claim_page(upage))
-            return false;
+		/* 3) type이 anon이면 */
+		if (!vm_alloc_page(type, upage, writable)) // uninit page 생성 & 초기화
+			return false;						   // init이랑 aux는 Lazy Loading에 필요. 지금 만드는 페이지는 기다리지 않고 바로 내용을 넣어줄 것이므로 필요 없음
 
-        // 매핑된 프레임에 내용 로딩
-        struct page *dst_page = spt_find_page(dst, upage);
-        memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
-    }
-    return true;
+		// vm_claim_page으로 요청해서 매핑 & 페이지 타입에 맞게 초기화
+		if (!vm_claim_page(upage))
+			return false;
+
+		// 매핑된 프레임에 내용 로딩
+		struct page *dst_page = spt_find_page(dst, upage);
+		memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+	}
+	return true;
 }
 
 

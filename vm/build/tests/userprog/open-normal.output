@@ -18,13 +18,13 @@ Executing 'open-normal':
 (open-normal) end
 open-normal: exit(0)
 Execution of 'open-normal' complete.
-Timer: 103 ticks
-Thread: 56 idle ticks, 41 kernel ticks, 6 user ticks
+Timer: 101 ticks
+Thread: 39 idle ticks, 52 kernel ticks, 10 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 111 reads, 248 writes
 hd1:0: 105 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1024 characters output
+Console: 1025 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

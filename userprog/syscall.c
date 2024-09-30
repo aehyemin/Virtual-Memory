@@ -20,6 +20,9 @@
 typedef int pid_t;
 struct lock filesys_lock;
 
+void munmap(void *addr);
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 void halt (void);
@@ -121,12 +124,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_CLOSE:
 			close(f->R.rdi);
 			break;  
-		// case SYS_MMAP:
-		// 	f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
-		// 	break;
-		// case SYS_MUNMAP:
-		// 	munmap(f->R.rdi);
-		// 	break;
+		case SYS_MMAP:
+			f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+			break;
+		case SYS_MUNMAP:
+			munmap(f->R.rdi);
+			break;
 	}
 }
 
@@ -267,5 +270,38 @@ void check_ptr(void *ptr)
 
 bool check_fd(int fd){
 	if(fd < 0 || maxfd <= fd) return true;
+	if(fd > 2 && thread_current()->fdt[fd] == NULL) return true;
 	return false;
 }
+
+//메모리매핑을 통해 파일의 내용을 프로세스의 가상 주소 공간에 직접 매핑하는 시스템 콜
+//파일의 내용을 메모리에 로드하지 않고도 파일 데이터를 직접 매핑할 수 있게됨
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+	if (!addr || addr != pg_round_down(addr)) 
+		return NULL;
+	
+	if (offset != pg_round_down(offset))
+		return NULL;
+
+	if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length))
+		return NULL;
+
+	if (spt_find_page(&thread_current()->spt, addr))
+		return NULL;
+
+	struct file *f = get_file(fd);
+	if (f == NULL)	
+		return NULL;
+
+	if (file_length(f) == 0 || (int)length <= 0)
+		return NULL;
+
+	return do_mmap(addr, length, writable, f, offset);
+	//파일이 매핑된 가상 주소 변환
+}
+
+void munmap(void *addr)
+{
+    do_munmap(addr);
+}
+
