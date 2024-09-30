@@ -176,36 +176,110 @@ vm_get_frame (void) {
 
 /* Growing the stack. */
 /* Growing the stack. */
+/* Growing the stack. */
 static void
 vm_stack_growth(void *addr UNUSED)
 {
-    // todo: 스택 크기를 증가시키기 위해 anon page를 하나 이상 할당하여 주어진 주소(addr)가 더 이상 예외 주소(faulted address)가 되지 않도록 합니다.
-    // todo: 할당할 때 addr을 PGSIZE로 내림하여 처리
-   // vm_alloc_page(VM_ANON | VM_MARKER_0, pg_round_down(addr), 1);
+	// todo: 스택 크기를 증가시키기 위해 anon page를 하나 이상 할당하여 주어진 주소(addr)가 더 이상 예외 주소(faulted address)가 되지 않도록 합니다.
+	// todo: 할당할 때 addr을 PGSIZE로 내림하여 처리
+	vm_alloc_page(VM_ANON | VM_MARKER_0, pg_round_down(addr), 1);
 }
-
 /* Handle the fault on write_protected page */
-static bool
-vm_handle_wp (struct page *page UNUSED) {
-}
+#define STACK_GROWTH_LIMIT (1 << 20) // 1MB
 
-
-/* Return true on success */
-/* Return true on success */
-/* Return true on success */
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
-		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
-	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
-	struct page *page = NULL;
-	/* TODO: Validate the fault */
-	/* TODO: Your code goes here */
-	page = spt_find_page(spt, addr);
-	if(page == NULL) return false;
+        bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
+    struct supplemental_page_table *spt = &thread_current ()->spt;
+    struct page *page = NULL;
 
-	return vm_do_claim_page (page);
+    if (addr == NULL) {
+     
+        return false;
+    }
+
+    if (is_kernel_vaddr(addr)) {
+        return false;
+    }
+
+    if (not_present) { // 접근한 메모리의 physical page가 존재하지 않은 경우
+     
+
+        /* Fault validation */
+        void *rsp = f->rsp; // user access인 경우 rsp는 유저 stack을 가리킨다
+        if (!user)  // kernel access 인 경우 thread 에서 rsp
+            rsp = thread_current()->rsp;
+
+        // 스택 확장으로 처리할 수 있는 폴트인 경우, vm_stack_growth를 호출한다.
+        // addr이 rsp 근처에 있는지 확인 (예: rsp - PGSIZE <= addr < rsp)
+        if ((addr >= (uint8_t *)rsp - PGSIZE) && 
+            (addr < USER_STACK) && 
+            (addr >= USER_STACK - STACK_GROWTH_LIMIT)) 
+                vm_stack_growth(addr);
+
+        page = spt_find_page(spt, addr);
+        if (page == NULL) {
+            return false;
+        }
+
+        if (write && !page->writable) { 
+            return false;
+        }
+
+
+        return vm_do_claim_page(page);
+    }
+
+   
+    return false;
 }
+// bool
+// vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
+// 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
+// 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
+// 	struct page *page = NULL;
+// 	/* TODO: Validate the fault */
+// 	/* TODO: Your code goes here */
+// 	if (addr == NULL)
+// 		return false;
+// 	if (is_kernel_vaddr(addr))
+// 		return false;
+	
+// 	if (not_present) {
+// 		//페이지 폴트가 스택 확장에 대해 유효한 경우인지 확인
+// 		void *rsp = f->rsp; //user access인 경우 rsp는 유저 stack을 가리킨다
+// 		if (!user) //kernel access 인 경우 thread 에서 rsp
+// 			rsp = thread_current()->rsp;
+// 		//(1<<20) is 1MB
+// 		//rsp - 8 페이지 폴트가 발생한 주소addr이 스택포인터 바로 아래에 위치한지
+// 		//addr <= USER_STACK 폴트가 발생한 주소가 유저 스택의 범위 내에 있는지
+// 		//USER_STACK은 유저 스택의 최상단 주소
+// 		if ((USER_STACK - (1<<20) <= rsp - 8 &&
+//             rsp - 8 == addr &&
+//             addr <= USER_STACK) || (USER_STACK - (1<<20) <= rsp &&
+//             rsp <= addr &&
+//             addr <= USER_STACK))
+//             {
+// 			vm_stack_growth(addr);
+//             }		
+// 		//유저 스택의 최상단에서 1MB이내의 범위만 있는지. 스택 확장은 유저스택의 1mb이내 범위만 허용
 
+		    
+//         page = spt_find_page(spt, addr);
+//         if (page == NULL) 
+//             return false;
+        
+//         if (write == 1 && page->writable == 0) //write불가능한 페이지에 write 요청
+//             return false;
+        
+//         return vm_do_claim_page(page);//페이지가 존재하고 쓰기 권한도 있는경우
+//     }
+//     return false;
+// }
+
+	//첫 번째 조건문은 스택 포인터 바로 아래에서 발생한 폴트를 처리.보통 함수 호출 시 스택이 확장될 때 발생합
+	//두 번째 조건문은 스택 포인터와 폴트가 발생한 주소가 유저 스택의 범위 내에 있는 경우 스택 확장을 처리
+			
 /* Free the page.
  * DO NOT MODIFY THIS FUNCTION. */
 void

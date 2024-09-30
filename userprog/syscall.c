@@ -74,9 +74,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	//printf("syscall_handler 시작\n");  // 이 출력이 되는지 먼저 확인
 	int number = f->R.rax;
 	//printf("syscall_handler: f = %p, rip = %p, rsp = %p\n", f, f->rip, f->rsp);
-//#ifdef VM
-    //thread_current()->rsp = f->rsp; // 추가
-//#endif
+#ifdef VM
+    thread_current()->rsp = f->rsp; // 추가
+#endif
 	switch (number)
 	{
 		case SYS_HALT:
@@ -121,8 +121,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_CLOSE:
 			close(f->R.rdi);
 			break;  
-		default:
-			break;
+		// case SYS_MMAP:
+		// 	f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+		// 	break;
+		// case SYS_MUNMAP:
+		// 	munmap(f->R.rdi);
+		// 	break;
 	}
 }
 
