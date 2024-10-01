@@ -18,13 +18,13 @@ Executing 'pt-bad-read':
 (pt-bad-read) open "sample.txt"
 pt-bad-read: exit(-1)
 Execution of 'pt-bad-read' complete.
-Timer: 103 ticks
-Thread: 48 idle ticks, 46 kernel ticks, 10 user ticks
+Timer: 108 ticks
+Thread: 50 idle ticks, 52 kernel ticks, 7 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 112 reads, 250 writes
 hd1:0: 106 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1040 characters output
+Console: 1039 characters output
 Keyboard: 0 keys pressed
 Exception: 1 page faults
 Powering off...

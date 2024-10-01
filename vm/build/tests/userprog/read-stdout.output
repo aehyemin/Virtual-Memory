@@ -17,13 +17,13 @@ Executing 'read-stdout':
 (read-stdout) end
 read-stdout: exit(0)
 Execution of 'read-stdout' complete.
-Timer: 98 ticks
-Thread: 52 idle ticks, 39 kernel ticks, 7 user ticks
+Timer: 108 ticks
+Thread: 39 idle ticks, 57 kernel ticks, 12 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 80 reads, 232 writes
 hd1:0: 102 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 962 characters output
+Console: 964 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

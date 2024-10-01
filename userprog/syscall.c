@@ -193,19 +193,31 @@ int filesize (int fd){
 int read (int fd, void *buffer, unsigned size){
 	if(check_fd(fd)) return -1;
 	check_ptr(buffer);
+	struct page *page = spt_find_page(fd, buffer);
 
 	if(fd == 0){
 		for(int i = 0; i < size; i++){
 			((char*)buffer)[i] = input_getc();
 		}
 		return size;
+		
+	} else if(fd == 1) {
+		return -1;
+
+	} else {
+		if (page == NULL || !page->writable) {
+			exit(-1);
+		}
 	}
-	else if(fd == 1) return -1;
-
 	struct file *f = get_file(fd);
-	if(f == NULL) return -1;
+	if(f == NULL) {
+		return -1;
+		}
 
-	return file_read(f, buffer, size);
+	lock_acquire(&filesys_lock);
+	int read_file = file_read(f, buffer, size);
+	lock_release(&filesys_lock);
+
 }
 int write (int fd, const void *buffer, unsigned size){
 	if(check_fd(fd)) return -1;

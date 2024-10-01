@@ -16,13 +16,13 @@ Executing 'bad-write2':
 (bad-write2) begin
 bad-write2: exit(-1)
 Execution of 'bad-write2' complete.
-Timer: 97 ticks
-Thread: 49 idle ticks, 41 kernel ticks, 8 user ticks
+Timer: 103 ticks
+Thread: 49 idle ticks, 46 kernel ticks, 8 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 80 reads, 232 writes
 hd1:0: 102 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 938 characters output
+Console: 939 characters output
 Keyboard: 0 keys pressed
 Exception: 1 page faults
 Powering off...

@@ -175,8 +175,7 @@ vm_get_frame (void) {
 }
 
 /* Growing the stack. */
-/* Growing the stack. */
-/* Growing the stack. */
+
 static void
 vm_stack_growth(void *addr UNUSED)
 {
