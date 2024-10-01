@@ -213,9 +213,6 @@ void lock_acquire(struct lock *lock)
 		curr->waiting_lock = lock;
 		lock->donor = curr;
 		list_push_back(&lock->holder->donators, &curr->donation_elem);
-		// list_insert_ordered(&lock->holder->donators, &curr->donation_elem,
-		// 					thread_compare_donate_priority, 0);
-		// donate
 		donate_pri(lock);
 	}
 

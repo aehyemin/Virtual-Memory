@@ -150,6 +150,7 @@ page_fault (struct intr_frame *f) {
 
 	// ..
 	if(user || not_present){
+		// printf("page fault\n");
 		exit(-1);
 	}
 	/* Count page faults. */

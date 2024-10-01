@@ -15,6 +15,7 @@
 #include "threads/mmu.h"
 #include "threads/palloc.h"
 #include "string.h"
+#include "vm/file.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -78,14 +79,16 @@ exit (int status) {
 
 tid_t
 fork_sys (const char *thread_name, struct intr_frame *f){
-	return process_fork(thread_name, f);
+	// lock_acquire(&filesys_lock);
+	tid_t tid = process_fork(thread_name, f);
+	// lock_release(&filesys_lock);
+	return tid;
 	// 	자식 프로세스에서, return 값은 0이어야 함
 	// 템플릿은 전체 user 메모리 공간을 복사하기 위해 `threads/mmu.c`에 있는 `pml4_for_each()` 이용
 }
 
 void check_address(const uint64_t *addr) {
 	struct thread *curr = thread_current();
-	//  || pml4_get_page(curr->pml4, addr) == NULL
 	if (addr == NULL || !(is_user_vaddr(addr))) {
 		exit(-1);
 	}
@@ -101,16 +104,17 @@ exec (const char *file) {
 	}
 	strlcpy(fn_copy, file, strlen(file)+1);
 
+	// printf("exec file : %s\n", file);
 	if (process_exec(fn_copy) == -1) {
 		exit(-1);
 	}
-
 	NOT_REACHED();
 	return 0;
 }
 
 int
 wait (tid_t pid) {
+	// printf("wait start\n");
 	return process_wait(pid);
 }
 
@@ -118,7 +122,10 @@ bool
 create (const char *file, unsigned initial_size) {
 	check_address((const uint64_t *)file);
 	// 새로운 파일 생성
-	return filesys_create(file, initial_size);
+	// lock_acquire(&filesys_lock);
+	bool success = filesys_create(file, initial_size);
+	// lock_release(&filesys_lock);
+	return success;
 }
 
 bool
@@ -130,15 +137,18 @@ remove (const char *file) {
 int
 open (const char *file) {
 	check_address((const uint64_t *)file);
+	// printf("open :: check address\n");
 	struct thread *curr = thread_current();
 	struct file *f;
 
 	if ((f = filesys_open(file))) {
+		// printf("open file : %s, %p\n", file, f);
 		for (int i = 3; i <= curr->max_fd; i++) {
 			if (*(curr->fd_table + i) == NULL) {
 				if (strcmp(thread_name(), file) == 0)
 					file_deny_write(f);
 				*(curr->fd_table + i) = f;
+				// printf("open i : %d\n", i);
 				return i;
 			}
 		}
@@ -159,7 +169,7 @@ open (const char *file) {
 		// fd 반환
 		return curr->max_fd;
 	}
-	
+	// printf("open :: fail\n");
 	return -1;
 }
 
@@ -180,12 +190,23 @@ void check_fd(const int fd) {
 	}
 }
 
+void check_buffer(void *buffer) {
+	struct thread *curr = thread_current();
+
+#ifdef VM
+	if (pml4_get_page(curr->pml4, buffer) && !spt_find_page(&curr->spt, buffer)->writable) {
+		exit(-1);
+	}
+#endif
+
+}
+
 int
 read (int fd, void *buffer, unsigned size) {
 	check_fd(fd);
 	check_address(buffer);
+	check_buffer(buffer);
 	
-	struct thread *curr = thread_current();
 	int bytes = 0;
 	if (fd == 0) {
 		for (unsigned i = 0; i< size; i++)
@@ -193,13 +214,13 @@ read (int fd, void *buffer, unsigned size) {
 		bytes = size;
 	}
 	else if (fd >=3) {
+		struct thread *curr = thread_current();
 		// file 찾기
 		struct file *file = *(curr->fd_table + fd);
 		if (file == NULL)
 			return -1;
-		// lock_acquire(&filesys_lock);
+		// else if ()
 		bytes = file_read(file, buffer, size);
-		// lock_release(&filesys_lock);
 	}
 	
 	return bytes;
@@ -211,19 +232,42 @@ close (int fd) {
 	struct thread *curr = thread_current();
 	// file 찾기
 	struct file *file = *(curr->fd_table + fd);
+	// printf("close file : %p\n", file);
 	if (file == NULL) {
 		exit(-1);
 	}
+	// lock_acquire(&filesys_lock);
 	file_close(file);
+	// lock_release(&filesys_lock);
 	if (fd == curr->max_fd)
 		curr->max_fd--;
 	*(curr->fd_table + fd) = NULL;
+}
+
+void *
+mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+	check_fd(fd);
+	// 콘솔 input 과 출력을 나타내는 파일 디스크립터는 매핑되지 않음
+	if (fd >= 0 && fd <= 2) {
+		return NULL;
+	}
+	// file 찾기
+	struct file *file = *(thread_current()->fd_table + fd);
+
+	return do_mmap(addr, length, writable, file, offset);;
+}
+
+void
+munmap (void *addr) {
+	do_munmap(addr);
 }
 
 int
 write (int fd, const void *buffer, unsigned size) {
 	check_fd(fd);
 	check_address(buffer);
+	check_buffer(buffer);
+
 	// fd 활용하여 file 찾기
 	if (fd == 1) {
 		//콘솔에 작성
@@ -238,7 +282,11 @@ write (int fd, const void *buffer, unsigned size) {
 			return -1;
 
 		// buffer에서 fd 파일로 size 바이트만큼 쓰기
-		return file_write(file, buffer, size);
+		// printf("write file : %p\n", file);
+		// lock_acquire(&filesys_lock);
+		int write_size = file_write(file, buffer, size);
+		// lock_release(&filesys_lock);
+		return write_size;
 	}
 	return 0;
 	
@@ -316,7 +364,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_CLOSE:
 			close(f->R.rdi);
 			break;
-		
+		case SYS_MMAP:
+			f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+			break;
+		case SYS_MUNMAP:
+			munmap(f->R.rdi);
+			break;
+
 		default:
 			exit(-1);
 			break;

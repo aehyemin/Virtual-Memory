@@ -2,6 +2,7 @@
 #define USERPROG_PROCESS_H
 
 #include "threads/thread.h"
+#include "vm/vm.h"
 
 struct container
 {
@@ -11,6 +12,7 @@ struct container
 	size_t page_zero_bytes;
 };
 
+struct page;
 
 tid_t process_create_initd(const char *file_name);
 tid_t process_fork(const char *name, struct intr_frame *if_);
@@ -20,5 +22,7 @@ void process_exit(void);
 void process_activate(struct thread *next);
 // 추가
 void argument_stack(char **argv, int argc, struct intr_frame *if_);
+
+bool lazy_load_segment (struct page *page, void *aux);
 
 #endif /* userprog/process.h */

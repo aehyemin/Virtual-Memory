@@ -268,8 +268,8 @@ int process_exec(void *f_name)
 	// printf("palloc_free_page\n");
 	/* If load failed, quit. */
 	palloc_free_page(file_name);
-	// printf("palloc_free_page done\n");
 	if (!success) {
+		// printf("load fail\n");
 		return -1;
 	}
 
@@ -302,6 +302,7 @@ int process_wait(tid_t child_tid UNUSED)
 	struct thread *curr = thread_current();
 	
 	if (child == NULL){
+		// printf("process_wait :: child is NULL\n");
 		return -1;
 	}
 
@@ -314,6 +315,7 @@ int process_wait(tid_t child_tid UNUSED)
 	list_remove(&child->child_elem);
 	sema_up(&child->exit_sema);
 
+	// printf("process_wait :: wait end\n");
 	return child_exit;
 }
 
@@ -325,15 +327,7 @@ void process_exit(void)
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	struct thread *curr = thread_current();
-	// struct thread *parent = curr->parent;
 	
-
-	// if (parent) {
-	// 	parent->child_exit = curr->exit_status;
-		// printf("process_exit child->exit_status : %d\n", parent->child_exit);
-	// 	sema_up(&parent->wait_sema);
-	// }
-	// list_remove(&thread_current()->child_elem);
 	sema_up(&curr->wait_sema);
 
 	sema_down(&curr->exit_sema);
@@ -512,7 +506,7 @@ load(const char *file_name, struct intr_frame *if_)
 	file = filesys_open(argv[0]);
 	if (file == NULL)
 	{
-		printf("load: %s: open failed\n", file_name);
+		printf("load: %s: open failed\n", argv[0]);
 		goto done;
 	}
 
@@ -759,7 +753,7 @@ install_page(void *upage, void *kpage, bool writable)
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-static bool
+bool
 lazy_load_segment (struct page *page, void *aux) {
     /* TODO: Load the segment from the file */
     /* TODO: This called when the first page fault occurs on address VA. */
