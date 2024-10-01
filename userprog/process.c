@@ -330,8 +330,8 @@ void process_exit(void)
 	
 	sema_up(&curr->wait_sema);
 
-	sema_down(&curr->exit_sema);
 	process_cleanup();
+	sema_down(&curr->exit_sema);
 }
 
 /* Free the current process's resources. */
