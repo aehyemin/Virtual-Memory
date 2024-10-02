@@ -23,6 +23,7 @@ static const struct page_operations uninit_ops = {
 };
 
 /* DO NOT MODIFY this function */
+// 새로운 uninitialized page에 필요한 data를 초기화해준다.
 void
 uninit_new (struct page *page, void *va, vm_initializer *init,
 		enum vm_type type, void *aux,
@@ -34,24 +35,27 @@ uninit_new (struct page *page, void *va, vm_initializer *init,
 		.va = va,
 		.frame = NULL, /* no frame for now */
 		.uninit = (struct uninit_page) {
-			.init = init,
-			.type = type,
-			.aux = aux,
-			.page_initializer = initializer,
+			.init = init, // page fault가 났을 시, data를 load하는 방식에 대한 함수를 의미한다.(e.g. lazy_load_segment)
+			.type = type, // page의 종류를 의미한다.(e.g. )
+			.aux = aux,   // Auxiliary data로 file-backed page의 경우 file과 관련된 정보를 저장한다.
+			.page_initializer = initializer,//page의 종류에 맞는 meta-data를 초기화한다.
 		}
 	};
 }
 
 /* Initalize the page on first fault */
+// 첫번째 page fault 시, page를 어떻게 초기화할지 설정한다.
 static bool
 uninit_initialize (struct page *page, void *kva) {
-	struct uninit_page *uninit = &page->uninit;
+	struct uninit_page *uninit = &page->uninit; // uninit 구조체 내 data를 참조한다.
 
 	/* Fetch first, page_initialize may overwrite the values */
-	vm_initializer *init = uninit->init;
+	//vm_initializer는 page fault가 났을 시, page를 어떤 방식으로 load 할 것인지를 정의한 구조체이다. 
+	vm_initializer *init = uninit->init;	// page를 어떤 방식으로 frame에 적재할지에 대한 정보를 담는다.(e.g. lazy_load_segment)
 	void *aux = uninit->aux;
 
 	/* TODO: You may need to fix this function. */
+	// Virtual address 와 Physical address를 대응시켜주고, page를 frame에 적재하는 과정을 거친다.
 	return uninit->page_initializer (page, uninit->type, kva) &&
 		(init ? init (page, aux) : true);
 }
