@@ -158,6 +158,7 @@ vm_get_frame (void) {
 		// 지금은 page 할당이 실패했을 때 swap out을 처리할 필요 없음
 		// 그냥 그런 케이스를 지금은 `PANIC(”todo”)` 로 표시
 		PANIC("todo");
+		// swap_out();
 	}
 	// user pool에서 성공적으로 페이지를 받으면, 프레임도 할당하고 그 멤버도 초기화한 후, 그것을 return
 	frame->page = NULL;

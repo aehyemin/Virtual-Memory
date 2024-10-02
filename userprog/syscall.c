@@ -246,15 +246,24 @@ close (int fd) {
 
 void *
 mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+    if (!is_user_vaddr(addr))
+        return NULL;
 	check_fd(fd);
+
+    struct file *file = *(thread_current()->fd_table + fd);
+
+    if ((int)length <= 0)
+        return NULL;
+
 	// 콘솔 input 과 출력을 나타내는 파일 디스크립터는 매핑되지 않음
 	if (fd >= 0 && fd <= 2) {
 		return NULL;
 	}
-	// file 찾기
-	struct file *file = *(thread_current()->fd_table + fd);
 
-	return do_mmap(addr, length, writable, file, offset);;
+	if (offset != pg_round_down(offset))
+        return NULL;
+
+	return do_mmap(addr, length, writable, file, offset);
 }
 
 void
@@ -266,7 +275,6 @@ int
 write (int fd, const void *buffer, unsigned size) {
 	check_fd(fd);
 	check_address(buffer);
-	check_buffer(buffer);
 
 	// fd 활용하여 file 찾기
 	if (fd == 1) {

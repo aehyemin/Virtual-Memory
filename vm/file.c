@@ -21,15 +21,25 @@ static const struct page_operations file_ops = {
 /* The initializer of file vm */
 void
 vm_file_init (void) {
+
 }
 
 /* Initialize the file backed page */
 bool
 file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler */
+	// printf("file_backed_initializer :: page : %p\n", page);
 	page->operations = &file_ops;
 
 	struct file_page *file_page = &page->file;
+
+	// struct container *c = page->uninit.aux;
+
+	// file_page->file = c->file;
+	// file_page->ofs = c->ofs;
+	// file_page->page_read_bytes = c->page_read_bytes;
+	// file_page->page_zero_bytes = c->page_zero_bytes;
+	// printf("file_backed_initializer :: done\n");
 
 	return true;
 }
@@ -49,7 +59,7 @@ file_backed_swap_out (struct page *page) {
 /* Destory the file backed page. PAGE will be freed by the caller. */
 static void
 file_backed_destroy (struct page *page) {
-	struct file_page *file_page UNUSED = &page->file;
+	struct file_page *file_page = &page->file;
 
 	// 쓰여진 페이지는 file에 쓰여짐
 	// 쓰여지지 않은 페이지는 그러면 안됨
@@ -57,7 +67,8 @@ file_backed_destroy (struct page *page) {
 
     if (pml4_is_dirty(thread_current()->pml4, page->va))
     {
-        file_write_at(c->file, page->va, c->page_read_bytes, c->ofs);
+		file_write_at(c->file, page->va, c->page_read_bytes, c->ofs);
+        // file_write_at(file_page->file, page->va, file_page->page_read_bytes, file_page->ofs);
         pml4_set_dirty(thread_current()->pml4, page->va, 0);
     }
     pml4_clear_page(thread_current()->pml4, page->va);
@@ -74,23 +85,21 @@ do_mmap (void *addr, size_t length, int writable,
 	// file_reopen 을 파일의 각 매핑에 대해 분리되고 독립적인 참조를 얻기 위해 사용
 	struct file *f = file_reopen(file);
     void *start_addr = addr;
-    // 이 매핑을 위해 사용한 총 페이지 수
-    // int total_page_count = length <= PGSIZE ? 1 : length % PGSIZE ? length / PGSIZE + 1
-    //                                                               : length / PGSIZE; 
 
 	uint32_t read_bytes, zero_bytes;
 	// `fd` 로 열린 파일을 `offset` 바이트부터 시작해서 `length` 바이트 만큼
 	// 프로세스의 가상주소 공간(`addr`)으로 map
     read_bytes = file_length(f) - offset < length ? file_length(f) - offset : (uint32_t)length;
-    zero_bytes = PGSIZE - read_bytes % PGSIZE;
+	// 만약 파일의 길이가 PGSIZE의 배수가 아닌 경우, 마지막 mapped page에 있는 몇몇 바이트는 파일 끝을 넘어 stick out 됨
+	// 페이지가 fault in 됐을 때 이러한 바이트를 0으로 set
+	// 페이지가 디스크로 쓰여 들어갈 때 버려라
+    zero_bytes = read_bytes > 0 ? PGSIZE - read_bytes % PGSIZE : 0;
 
 	// 페이지 정렬
     ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
 	// 만약 addr가 페이지 정렬 되어 있지 않으면 실패
 	// 매핑된 페이지 범위가 기존에 매핑된 페이지(스택이나 실행파일 로드시 매핑된 페이지 포함)와 겹치면 실패
-    ASSERT(pg_ofs(addr) == 0);
-	// 만약 파일의 길이가 PGSIZE의 배수가 아닌 경우, 마지막 mapped page에 있는 몇몇 바이트는 파일 끝을 넘어 stick out 됨
-	// 페이지가 fault in 됐을 때 이러한 바이트를 0으로 set 하고 페이지가 디스크로 쓰여 들어갈 때 버려라
+    // ASSERT(pg_ofs(addr) == 0);
     // ASSERT(offset % PGSIZE == 0);
 
 	int page_count = 0;
