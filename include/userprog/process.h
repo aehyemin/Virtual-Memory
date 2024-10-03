@@ -1,6 +1,5 @@
 #ifndef USERPROG_PROCESS_H
 #define USERPROG_PROCESS_H
-
 #include "threads/thread.h"
 
 tid_t process_create_initd(const char *file_name);
@@ -14,5 +13,11 @@ int process_add_file(struct file *f);
 struct file *process_get_file(int fd);
 void process_close_file(int fd);
 struct thread *get_child_process(int pid);
-
+struct lazy_load_arg
+{
+    struct file *file;
+    off_t ofs;
+    uint32_t read_bytes;
+    uint32_t zero_bytes;
+};
 #endif /* userprog/process.h */
